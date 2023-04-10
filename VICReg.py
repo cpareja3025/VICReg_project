@@ -77,6 +77,9 @@ f.close()
 n_total_steps = len(train_loader)
 for epoch in range(epochs):
     running_loss = 0.0
+    running_inv_loss = 0.0
+    running_var_loss = 0.0
+    running_cov_loss = 0.0
     for i, (images, labels) in enumerate(train_loader):
         images = images.to(device)
         # two randomly augmented versions of image
@@ -106,17 +109,22 @@ for epoch in range(epochs):
 
         # compute loss between two different data augs!
         # train for 20 epochs and make a loss curve
-        loss = (sim_loss) + (mu * std_loss) + (nu*cov_loss)
+        std_loss = mu * std_loss
+        cov_loss = nu * cov_loss
+        loss = sim_loss + std_loss + cov_loss
 
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
-        running_loss += loss.item() * image_i.size(1)
+        running_loss += loss.item() 
 
         if (i+1) % 100 == 0:
-            print(f'Epoch [{epoch+1}/{epochs}], Step [{i+1}/{n_total_steps}], Loss: {loss.item():.4f} ')
+            print(f'Epoch [{epoch+1}/{epochs}], Step [{i+1}/{n_total_steps}], Loss: {loss.item():.4f}, Invariance Loss: {sim_loss}, Variance Loss: {std_loss}. Covariance Loss: {cov_loss}')
     epoch_loss = running_loss / len(train_loader)
+    epoch_inv_loss = running_inv_loss / len(train_loader)
+    epoch_var_loss = running_var_loss / len(train_loader)
+    epoch_cov_loss = running_cov_loss / len(train_loader)
     f = open("/Users/cpare/repos/VICReg_project/csv's/VICReg_metrics2.csv", "a")
-    f.write(f"{epoch + 1}, {epoch_loss}\n")
+    f.write(f"{epoch + 1}, {epoch_loss}, {epoch_inv_loss}, {epoch_var_loss}, {epoch_cov_loss}\n")
     f.close()
