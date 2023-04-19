@@ -11,14 +11,14 @@ import matplotlib.pyplot as plt
 from torchinfo import summary
 
 #Hyper Parameters
-batch_size = 64
+batch_size = 128
 learning_rate = 0.0001
 epochs = 100
 # Dimension (D) of the representations
-embedding_dimension = 32
-lam = 25
-mu = 25
-nu = 1
+embedding_dimension = 512
+lam = 0.1
+mu = 0.1
+nu = 1e-07
 
 transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=0.1307, std=0.3081)])
 train_dataset = torchvision.datasets.MNIST(root="./", train=True, download=True, transform=transform)
@@ -33,17 +33,14 @@ class CNN_augs(nn.Module):
     def __init__(self):
         super(CNN_augs, self).__init__()
         #32 output channels --> change kernel size to 3 or 5
-        # ***ENCODER***
         self.conv1 = nn.Conv2d(1, 32, kernel_size=1)
         #64 output channels --> 
         self.conv2 = nn.Conv2d(32, 64, kernel_size=3)
         self.conv3 = nn.Conv2d(64,128, kernel_size=2)
         self.max_pool = nn.MaxPool2d(2, 2)
-        # ***EXPANDER***
         self.fc1 = nn.Linear(128, 512)
         self.fc2 = nn.Linear(512, 512)
         # 3 fully connected layers
-        # embedding dimension will be 32
         self.fc3 = nn.Linear(512,embedding_dimension)
 
     def forward(self, x):
@@ -53,7 +50,7 @@ class CNN_augs(nn.Module):
         x = self.max_pool(x)
         x = F.relu(self.conv3(x))
         x = self.max_pool(x)
-         #print(f"Shape of Representations space after encoder {x.shape}")
+        #print(f"Shape of Representations space after encoder {x.shape}")
         # Shape of Representations space (Y and Y prime) is [64, 128, 1, 1]
         x = x.view(-1,128)
         x = F.relu(self.fc1(x))
@@ -75,32 +72,9 @@ class CNN_augs(nn.Module):
         n, m = x.shape
         assert n == m
         return x.flatten()[:-1].view(n - 1, n + 1)[:, 1:].flatten()
-        
-    
-
-model_vicreg = CNN_augs().to(device=device)
-print(summary(model_vicreg, input_size=[(batch_size, 1, 20, 20)]))
-optimizer = torch.optim.Adam(model_vicreg.parameters(), lr = learning_rate)
-
-f = open("/Users/cpare/repos/VICReg_project/csv's/VICReg_metrics2.csv","w+" )
-f.write("Epoch, Loss, Inv Loss, Var Loss, Cov Loss\n")
-f.close()
-n_total_steps = len(train_loader)
-for epoch in range(epochs):
-    running_loss = 0.0
-    running_inv_loss = 0.0
-    running_var_loss = 0.0
-    running_cov_loss = 0.0
-    for i, (images, labels) in enumerate(train_loader):
-        images = images.to(device)
-        # two randomly augmented versions of image
-        image_i = model_vicreg.data_aug(images)
-        image_j = model_vicreg.data_aug(images)
-
-        labels = labels.to(device)
-        #compute embeddings, loss is computed at the embedding level!
-        output_i = model_vicreg(image_i)
-        output_j = model_vicreg(image_j)
+    def VIC_Reg_loss(self, aug1, aug2):
+        output_i = model_vicreg(aug1)
+        output_j = model_vicreg(aug2)
 
         #invariance loss
         sim_loss = nn.MSELoss()
@@ -124,11 +98,57 @@ for epoch in range(epochs):
         cov_loss = nu * cov_loss
         loss = sim_loss + std_loss + cov_loss
 
+        return loss, sim_loss, std_loss, cov_loss
+    def produce_two_augs(self, image):
+        image_i = model_vicreg.data_aug(image)
+        image_j = model_vicreg.data_aug(image)
+        
+        return image_i, image_j
+  
+    def before_train(self, image):
+        aug1, aug2 = model_vicreg.produce_two_augs(image)
+        loss, sim_loss, std_loss, cov_loss = model_vicreg.VIC_Reg_loss(aug1, aug2)
+
+        return loss
+
+
+        
+    
+
+model_vicreg = CNN_augs().to(device=device)
+print(summary(model_vicreg, input_size=[(batch_size, 1, 20, 20)]))
+optimizer = torch.optim.Adam(model_vicreg.parameters(), lr = learning_rate)
+
+f = open("./VICReg_metrics_allLosses_withVal.csv","w+" )
+f.write("Epoch, Loss, Inv Loss, Var Loss, Cov Loss\n")
+f.close()
+n_total_steps = len(train_loader)
+
+with torch.no_grad():
+  image = next(iter(train_loader))[0]
+  aug1, aug2 = model_vicreg.produce_two_augs(image)
+  loss_b, _, _, _, = model_vicreg.VIC_Reg_loss(aug1, aug2)
+  print(loss_b.item())
+
+
+for epoch in range(epochs):
+    running_loss = 0.0
+    running_inv_loss = 0.0
+    running_var_loss = 0.0
+    running_cov_loss = 0.0
+
+    for i, (images, labels) in enumerate(train_loader):
+        images = images.to(device)
+        # two randomly augmented versions of image
+        image_i, image_j = model_vicreg.produce_two_augs(images)
+        # Calculate VICReg Losss
+        loss, sim_loss, std_loss, cov_loss = model_vicreg.VIC_Reg_loss(image_i, image_j)
+        # Train
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
 
-        running_loss += loss.item()
+        running_loss += loss.item() 
         running_inv_loss += sim_loss
         running_var_loss += std_loss
         running_cov_loss += cov_loss
@@ -139,6 +159,6 @@ for epoch in range(epochs):
     epoch_inv_loss = running_inv_loss / len(train_loader)
     epoch_var_loss = running_var_loss / len(train_loader)
     epoch_cov_loss = running_cov_loss / len(train_loader)
-    f = open("/Users/cpare/repos/VICReg_project/csv's/VICReg_metrics2.csv", "a")
+    f = open("VICReg_metrics_allLosses_withVal.csv", "a")
     f.write(f"{epoch + 1}, {epoch_loss}, {epoch_inv_loss}, {epoch_var_loss}, {epoch_cov_loss}\n")
     f.close()
