@@ -15,15 +15,20 @@ batch_size = 128
 learning_rate = 0.0001
 epochs = 100
 # Dimension (D) of the representations
-embedding_dimension = 512
+embedding_dimension = 1024
 lam = 0.1
 mu = 0.1
 nu = 1e-07
 
-transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=0.1307, std=0.3081)])
-train_dataset = torchvision.datasets.MNIST(root="./", train=True, download=True, transform=transform)
-test_dataset = torchvision.datasets.MNIST(root="./", train=False, download=True, transform=transform)
-train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+#transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=0.1307, std=0.3081)])
+
+
+dataset = torchvision.datasets.MNIST(root="./", train=True, download=True, transform=transforms.ToTensor())
+test_dataset = torchvision.datasets.MNIST(root="./", train=False, download=True, transform=transforms.ToTensor())
+train_data, val_data = random_split(dataset, [50000, 10000])
+
+train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True, pin_memory=True)
+val_loader = DataLoader(val_data, batch_size=batch_size, shuffle=True, pin_memory=True)
 test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -38,10 +43,10 @@ class CNN_augs(nn.Module):
         self.conv2 = nn.Conv2d(32, 64, kernel_size=3)
         self.conv3 = nn.Conv2d(64,128, kernel_size=2)
         self.max_pool = nn.MaxPool2d(2, 2)
-        self.fc1 = nn.Linear(128, 512)
-        self.fc2 = nn.Linear(512, 512)
+        self.fc1 = nn.Linear(128, 1024)
+        self.fc2 = nn.Linear(1024, 1024)
         # 3 fully connected layers
-        self.fc3 = nn.Linear(512,embedding_dimension)
+        self.fc3 = nn.Linear(1024,embedding_dimension)
 
     def forward(self, x):
         x = F.relu(self.conv1(x))
@@ -119,16 +124,26 @@ model_vicreg = CNN_augs().to(device=device)
 print(summary(model_vicreg, input_size=[(batch_size, 1, 20, 20)]))
 optimizer = torch.optim.Adam(model_vicreg.parameters(), lr = learning_rate)
 
-f = open("./VICReg_metrics_allLosses_withVal.csv","w+" )
-f.write("Epoch, Loss, Inv Loss, Var Loss, Cov Loss\n")
+f = open("./VICReg_metrics_1024.csv","w+" )
+f.write("Epoch, Train Loss, Val Loss, Inv Loss, Var Loss, Cov Loss\n")
 f.close()
 n_total_steps = len(train_loader)
 
 with torch.no_grad():
-  image = next(iter(train_loader))[0]
-  aug1, aug2 = model_vicreg.produce_two_augs(image)
-  loss_b, _, _, _, = model_vicreg.VIC_Reg_loss(aug1, aug2)
+  image_train = next(iter(train_loader))[0]
+  image_train = image_train.to(device)
+  image_val = next(iter(val_loader))[0]
+  image_val = image_val.to(device)
+  aug1, aug2 = model_vicreg.produce_two_augs(image_train)
+  loss_b, sim_loss_b, std_loss_b, cov_loss_b = model_vicreg.VIC_Reg_loss(aug1, aug2)
+  val_loss_b, _, _, _, = model_vicreg.VIC_Reg_loss(aug1, aug2)
   print(loss_b.item())
+  print(val_loss_b.item())
+
+
+f = open("./VICReg_metrics_1024.csv", "a")
+f.write(f"{0},{loss_b.item()}, {val_loss_b.item()}, {sim_loss_b}, {std_loss_b}, {cov_loss_b}\n")
+f.close()
 
 
 for epoch in range(epochs):
@@ -154,11 +169,22 @@ for epoch in range(epochs):
         running_cov_loss += cov_loss
 
         if (i+1) % 100 == 0:
-            print(f'Epoch [{epoch+1}/{epochs}], Step [{i+1}/{n_total_steps}], Loss: {loss.item():.4f}, Invariance Loss: {sim_loss}, Variance Loss: {std_loss}. Covariance Loss: {cov_loss}')
+            print(f'Epoch [{epoch+1}/{epochs}], Step [{i+1}/{n_total_steps}], Loss: {loss.item():.4f}, Invariance Loss: {sim_loss}, Variance Loss: {std_loss}. Covariance Loss: {cov_loss}')  
+    running_val_loss = 0.0
+    for i, (images, labels) in enumerate(val_loader):
+        images = images.to(device)
+        image_i, image_j = model_vicreg.produce_two_augs(images)
+        loss_val, sim_loss_val, std_loss_val, cov_loss_val = model_vicreg.VIC_Reg_loss(image_i, image_j)
+
+        running_val_loss += loss_val.item()
+
+
+
     epoch_loss = running_loss / len(train_loader)
     epoch_inv_loss = running_inv_loss / len(train_loader)
     epoch_var_loss = running_var_loss / len(train_loader)
     epoch_cov_loss = running_cov_loss / len(train_loader)
-    f = open("VICReg_metrics_allLosses_withVal.csv", "a")
-    f.write(f"{epoch + 1}, {epoch_loss}, {epoch_inv_loss}, {epoch_var_loss}, {epoch_cov_loss}\n")
+    epoch_val_loss = running_val_loss / len(val_loader)
+    f = open("./VICReg_metrics_1024.csv", "a")
+    f.write(f"{epoch + 1}, {epoch_val_loss}, {epoch_loss}, {epoch_inv_loss}, {epoch_var_loss}, {epoch_cov_loss}\n")
     f.close()
