@@ -16,9 +16,9 @@ learning_rate = 0.0001
 epochs = 100
 # Dimension (D) of the representations
 embedding_dimension = 1024
-lam = 0.1
-mu = 0.1
-nu = 1e-07
+lam = 25
+mu = 25
+nu = 1
 
 #transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=0.1307, std=0.3081)])
 
