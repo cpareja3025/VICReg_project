@@ -244,29 +244,64 @@ elif (arg1 == "Classify"):
     f = open("../csv's/Classifer_metrics.csv","w+" )
     f.write("Epoch, Train Loss, Val Loss\n")
     f.close()
-
-    # loaded_model.before_train(loaded_model)
     print("Loaded the model")
 
+    with torch.no_grad():
+        image_train = next(iter(train_loader))[0]
+        image_train = image_train.to(device)
+        train_label = next(iter(train_loader))[1]
+        image_val = next(iter(val_loader))[0]
+        image_val = image_val.to(device)
+        val_label = next(iter(val_loader))[1]
+        output_train = loaded_model(image_train)
+        output_val = loaded_model(image_val)
+        loss_t = criterion(output_train,train_label)
+        loss_v = criterion(output_val, val_label)
+
+    print(f"Loss before training: {loss_t.item()}")
+    print(f"Loss before validation: {loss_v.item()}")
+    f = open("../csv's/Classifer_metrics.csv","a")
+    f.write(f"{0},{loss_t.item()}, {loss_v.item()}\n")
+    f.close()
+
     for epoch in range(epochs):
+        running_trainloss = 0.0
+        running_val_loss = 0.0
         for i, (images,labels) in enumerate(train_loader):
             images = images.to(device)
             labels = labels.to(device)
-            #print(f"Shape of Images before passing to model: {images.shape}")
             outputs = loaded_model(images)
-            # print(f"Shape of Outputs after passing it to model: {outputs.shape}")
-            # print(f"Shape of labels: {labels.shape}")
-
-            loss = criterion(outputs, labels)
+            train_loss = criterion(outputs, labels)
 
             optimizer.zero_grad()
-            loss.backward()
+            train_loss.backward()
             optimizer.step()
 
-            if (i+1) % 100 ==0:
-                print(f'Epoch [{epoch+1}/{epochs}], Step [{i+1}/{n_total_steps}], Loss: {loss.item():.4f}')
+            running_trainloss += train_loss.item()
 
-    print("Finished Training")
+            if (i+1) % 100 ==0:
+                print(f'Epoch [{epoch+1}/{epochs}], Step [{i+1}/{n_total_steps}], Loss: {train_loss.item():.4f}')
+
+
+        for i, (images, labels) in enumerate(val_loader):
+            images = images.to(device)
+            labels = labels.to(device)
+
+            outputs = loaded_model(images)
+
+            val_loss = criterion(outputs, labels)
+
+            optimizer.zero_grad()
+            val_loss.backward()
+            optimizer.step()
+
+            running_val_loss += val_loss.item()
+        
+        epoch_train_loss = running_trainloss / len(train_loader)
+        epoch_val_loss = running_val_loss / len(val_loader)
+        f = open("../csv's/Classifer_metrics.csv","a")
+        f.write(f"{epoch+1},{epoch_train_loss},{epoch_val_loss}\n")
+        f.close()
 
 
 else:
