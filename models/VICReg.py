@@ -12,12 +12,12 @@ import matplotlib.pyplot as plt
 from torchinfo import summary
 
 
-FILE  = "../saved_models/vic_reg_model.pth"
+FILE  = "../saved_models/VICReg.pth"
 
 #Hyper Parameters
 batch_size = 128
 learning_rate = 0.0001
-epochs = 100
+epochs = 10
 # Dimension (D) of the representations
 embedding_dimension = 64
 lam = 25
@@ -32,7 +32,7 @@ train_data, val_data = random_split(dataset, [50000, 10000])
 train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True, pin_memory=True)
 val_loader = DataLoader(val_data, batch_size=batch_size, shuffle=True, pin_memory=True)
 test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
-
+n_total_steps = len(train_loader)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
@@ -45,11 +45,11 @@ class VICReg(nn.Module):
         self.conv2 = nn.Conv2d(8, 16, kernel_size=3)
         self.conv3 = nn.Conv2d(16,32, kernel_size=2)
         self.max_pool = nn.MaxPool2d(2, 2)
-        self.fc1 = nn.Linear(32, 64)
+        self.fc1 = nn.Linear(128, 64)
         self.fc2 = nn.Linear(64, 64)
         # 3 fully connected layers
         self.fc3 = nn.Linear(64,embedding_dimension)
-        self.fc1_classify = nn.Linear(32,64)
+        self.fc1_classify = nn.Linear(128,64)
         self.fc2_classfiy = nn.Linear(64,64)
         self.fc3_classify = nn.Linear(64,10)
 
@@ -64,24 +64,27 @@ class VICReg(nn.Module):
             x = self.max_pool(x)
             #print(f"Shape of Representations space after encoder {x.shape}")
             # Shape of Representations space (Y and Y prime) is [64, 128, 1, 1]
-            x = x.view(-1,32)
+            x = x.view(-1,128)
             x = F.relu(self.fc1(x))
             x = F.relu(self.fc2(x))
             x = F.relu(self.fc3(x))
             #print(f'Shape of Embedding space after expander {x.shape}')
             # Shape of Embeddings space (Z and Z prime) is [batch_size, embedding_dimension]
-        else:
+        elif (arg1 == "Classify"):
             x = F.relu(self.conv1(x))
             x = self.max_pool(x)
             x = F.relu(self.conv2(x))
             x = self.max_pool(x)
             x = F.relu(self.conv3(x))
             x = self.max_pool(x)
+            # print(f"Shape of representation space {x.shape}")
             ## Representation Space
-            x = x.view(-1,32)
+            x = x.view(-1,128)
+            # print(f"Shape after flatenning {x.shape}")
             x = F.relu(self.fc1_classify(x))
             x = F.relu(self.fc2_classfiy(x))
             x = self.fc3_classify(x)
+            # print(f"Shape after entire Network {x.shape}")
         return x
     def data_aug(self, img_tensor):
         aug = transforms.RandomResizedCrop(20, scale=(0.08,0.1))(img_tensor)
@@ -119,7 +122,7 @@ class VICReg(nn.Module):
         output_j = output_j - torch.mean(output_j, dim=0)
         cov_output_i = (torch.matmul(torch.transpose(output_i, 0, 1), output_i) / (batch_size -1))
         cov_output_j = (torch.matmul(torch.transpose(output_j, 0, 1), output_j) / (batch_size -1))
-        cov_loss = (model_vicreg.off_diagonal(cov_output_i).pow(2).sum() / embedding_dimension) + (model_vicreg.off_diagonal(cov_output_j).pow(2).sum() / embedding_dimension)
+        cov_loss = (model.off_diagonal(cov_output_i).pow(2).sum() / embedding_dimension) + (model.off_diagonal(cov_output_j).pow(2).sum() / embedding_dimension)
 
         # compute loss between two different data augs!
         # train for 20 epochs and make a loss curve
@@ -128,23 +131,21 @@ class VICReg(nn.Module):
         loss = sim_loss + std_loss + cov_loss
 
         return loss, sim_loss, std_loss, cov_loss
-    def produce_two_augs(self, image):
-        image_i = model_vicreg.data_aug(image)
-        image_j = model_vicreg.data_aug(image)
+    def produce_two_augs(self, image, model):
+        image_i = model.data_aug(image)
+        image_j = model.data_aug(image)
         
         return image_i, image_j
   
-    def before_train(self, model_vicreg):
+    def before_train(self, model):
         with torch.no_grad():
             image_train = next(iter(train_loader))[0]
             image_train = image_train.to(device)
             image_val = next(iter(val_loader))[0]
             image_val = image_val.to(device)
-            aug1, aug2 = model_vicreg.produce_two_augs(image_train)
-            print(aug1.size())
-            print(aug2.size())
-            loss_b, sim_loss_b, std_loss_b, cov_loss_b = model_vicreg.VIC_Reg_loss(aug1, aug2,model_vicreg)
-            val_loss_b, _, _, _, = model_vicreg.VIC_Reg_loss(aug1, aug2, model_vicreg)
+            aug1, aug2 = model.produce_two_augs(image_train, model)
+            loss_b, sim_loss_b, std_loss_b, cov_loss_b = model.VIC_Reg_loss(aug1, aug2,model)
+            val_loss_b, _, _, _, = model.VIC_Reg_loss(aug1, aug2, model)
             print(loss_b.item())
             print(val_loss_b.item())
             f = open("../csv's/VICReg_metrics_64_space.csv", "a")
@@ -182,7 +183,6 @@ if (arg1 == "Train"):
     model_vicreg = VICReg().to(device=device)
     print(summary(model_vicreg, input_size=[(batch_size, 1, 20, 20)]))
     optimizer = torch.optim.Adam(model_vicreg.parameters(), lr = learning_rate)
-    n_total_steps = len(train_loader)
 
     f = open("../csv's/VICReg_metrics_64_space.csv","w+" )
     f.write("Epoch, Train Loss, Val Loss, Inv Loss, Var Loss, Cov Loss\n")
@@ -199,7 +199,7 @@ if (arg1 == "Train"):
         for i, (images, labels) in enumerate(train_loader):
             images = images.to(device)
             # two randomly augmented versions of image
-            image_i, image_j = model_vicreg.produce_two_augs(images)
+            image_i, image_j = model_vicreg.produce_two_augs(images, model_vicreg)
             # Calculate VICReg Losss
             loss, sim_loss, std_loss, cov_loss = model_vicreg.VIC_Reg_loss(image_i, image_j, model_vicreg)
             # Train
@@ -217,7 +217,7 @@ if (arg1 == "Train"):
         running_val_loss = 0.0
         for i, (images, labels) in enumerate(val_loader):
             images = images.to(device)
-            image_i, image_j = model_vicreg.produce_two_augs(images)
+            image_i, image_j = model_vicreg.produce_two_augs(images, model_vicreg)
             loss_val, sim_loss_val, std_loss_val, cov_loss_val = model_vicreg.VIC_Reg_loss(image_i, image_j, model_vicreg)
 
             running_val_loss += loss_val.item()
@@ -234,6 +234,40 @@ if (arg1 == "Train"):
         f.write(f"{epoch + 1}, {epoch_val_loss}, {epoch_loss}, {epoch_inv_loss}, {epoch_var_loss}, {epoch_cov_loss}\n")
         f.close()
 elif (arg1 == "Classify"):
-    pass
+    loaded_model = VICReg().to(device=device)
+    loaded_model.load_state_dict(torch.load(FILE))
+    loaded_model.eval()
+
+    criterion = nn.CrossEntropyLoss()
+    optimizer  = torch.optim.Adam(loaded_model.parameters(), lr=learning_rate)
+
+    f = open("../csv's/Classifer_metrics.csv","w+" )
+    f.write("Epoch, Train Loss, Val Loss\n")
+    f.close()
+
+    # loaded_model.before_train(loaded_model)
+    print("Loaded the model")
+
+    for epoch in range(epochs):
+        for i, (images,labels) in enumerate(train_loader):
+            images = images.to(device)
+            labels = labels.to(device)
+            #print(f"Shape of Images before passing to model: {images.shape}")
+            outputs = loaded_model(images)
+            # print(f"Shape of Outputs after passing it to model: {outputs.shape}")
+            # print(f"Shape of labels: {labels.shape}")
+
+            loss = criterion(outputs, labels)
+
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            if (i+1) % 100 ==0:
+                print(f'Epoch [{epoch+1}/{epochs}], Step [{i+1}/{n_total_steps}], Loss: {loss.item():.4f}')
+
+    print("Finished Training")
+
+
 else:
     print("Error: Invalid arguments passed")
