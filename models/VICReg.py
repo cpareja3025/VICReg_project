@@ -17,7 +17,7 @@ FILE  = "../saved_models/VICReg.pth"
 #Hyper Parameters
 batch_size = 128
 learning_rate = 0.0001
-epochs = 10
+epochs = 100
 # Dimension (D) of the representations
 embedding_dimension = 64
 lam = 25
@@ -250,9 +250,11 @@ elif (arg1 == "Classify"):
         image_train = next(iter(train_loader))[0]
         image_train = image_train.to(device)
         train_label = next(iter(train_loader))[1]
+        train_label = train_label.to(device)
         image_val = next(iter(val_loader))[0]
         image_val = image_val.to(device)
         val_label = next(iter(val_loader))[1]
+        val_label = val_label.to(device)
         output_train = loaded_model(image_train)
         output_val = loaded_model(image_val)
         loss_t = criterion(output_train,train_label)
