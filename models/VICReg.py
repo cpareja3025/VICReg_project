@@ -19,7 +19,7 @@ batch_size = 128
 learning_rate = 0.0001
 epochs = 100
 # Dimension (D) of the representations
-embedding_dimension = 64
+embedding_dimension = 32
 lam = 25
 mu = 25
 nu = 1
