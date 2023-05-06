@@ -176,8 +176,6 @@ class Classifier(nn.Module):
 
         return x
 
-
-
 arg1 = sys.argv[1]
 if (arg1 == "Train"):
     model_vicreg = VICReg().to(device=device)
@@ -242,7 +240,7 @@ elif (arg1 == "Classify"):
     optimizer  = torch.optim.Adam(loaded_model.parameters(), lr=learning_rate)
 
     f = open("../csv's/Classifer_metrics.csv","w+" )
-    f.write("Epoch, Train Loss, Val Loss\n")
+    f.write("Epoch, Train Loss, Val Loss, Train Accuracy, Val Accuracy\n")
     f.close()
     print("Loaded the model")
 
@@ -269,10 +267,16 @@ elif (arg1 == "Classify"):
     for epoch in range(epochs):
         running_trainloss = 0.0
         running_val_loss = 0.0
+        n_correct = 0.0
+        n_samples = 0.0
         for i, (images,labels) in enumerate(train_loader):
             images = images.to(device)
             labels = labels.to(device)
             outputs = loaded_model(images)
+            _, predicted = torch.max(outputs, 1)
+            n_samples += labels.size(0)
+            n_correct += (predicted == labels).sum().item()
+
             train_loss = criterion(outputs, labels)
 
             optimizer.zero_grad()
@@ -283,28 +287,30 @@ elif (arg1 == "Classify"):
 
             if (i+1) % 100 ==0:
                 print(f'Epoch [{epoch+1}/{epochs}], Step [{i+1}/{n_total_steps}], Loss: {train_loss.item():.4f}')
+        train_acc = 100.0 * n_correct / n_samples
 
+        with torch.no_grad():
+            n_correct = 0.0
+            n_samples = 0.0
+            for i, (images, labels) in enumerate(val_loader):
+                images = images.to(device)
+                labels = labels.to(device)
 
-        for i, (images, labels) in enumerate(val_loader):
-            images = images.to(device)
-            labels = labels.to(device)
+                outputs = loaded_model(images)
+                _, predicted = torch.max(outputs, 1)
+                n_samples += labels.size(0)
+                n_correct += (predicted == labels).sum().item()
 
-            outputs = loaded_model(images)
+                val_loss = criterion(outputs, labels)
 
-            val_loss = criterion(outputs, labels)
-
-            optimizer.zero_grad()
-            val_loss.backward()
-            optimizer.step()
-
-            running_val_loss += val_loss.item()
-        
-        epoch_train_loss = running_trainloss / len(train_loader)
-        epoch_val_loss = running_val_loss / len(val_loader)
-        f = open("../csv's/Classifer_metrics.csv","a")
-        f.write(f"{epoch+1},{epoch_train_loss},{epoch_val_loss}\n")
-        f.close()
-
+                running_val_loss += val_loss.item()
+            
+            epoch_train_loss = running_trainloss / len(train_loader)
+            epoch_val_loss = running_val_loss / len(val_loader)
+            val_acc = 100.0 * n_correct / n_samples
+            f = open("../csv's/Classifer_metrics.csv","a")
+            f.write(f"{epoch+1},{epoch_train_loss},{epoch_val_loss},{train_acc},{val_acc}\n")
+            f.close()
 
 else:
     print("Error: Invalid arguments passed")
