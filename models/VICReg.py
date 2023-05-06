@@ -288,6 +288,7 @@ elif (arg1 == "Classify"):
             if (i+1) % 100 ==0:
                 print(f'Epoch [{epoch+1}/{epochs}], Step [{i+1}/{n_total_steps}], Loss: {train_loss.item():.4f}')
         train_acc = 100.0 * n_correct / n_samples
+        print(f'Training Accuracy for epoch {epoch+1}: {train_acc}') 
 
         with torch.no_grad():
             n_correct = 0.0
@@ -311,6 +312,7 @@ elif (arg1 == "Classify"):
             f = open("../csv's/Classifer_metrics.csv","a")
             f.write(f"{epoch+1},{epoch_train_loss},{epoch_val_loss},{train_acc},{val_acc}\n")
             f.close()
+            print(f'Validation Accuracy for {epoch+1}: {val_acc}')
 
 else:
     print("Error: Invalid arguments passed")
