@@ -239,7 +239,7 @@ elif (arg1 == "Classify"):
     criterion = nn.CrossEntropyLoss()
     optimizer  = torch.optim.Adam(loaded_model.parameters(), lr=learning_rate)
 
-    f = open("../csv's/Classifer_metrics.csv","w+" )
+    f = open("../csv's/Classifer_metrics_1Layer.csv","w+" )
     f.write("Epoch, Train Loss, Val Loss, Train Accuracy, Val Accuracy\n")
     f.close()
     print("Loaded the model")
@@ -260,7 +260,7 @@ elif (arg1 == "Classify"):
 
     print(f"Loss before training: {loss_t.item()}")
     print(f"Loss before validation: {loss_v.item()}")
-    f = open("../csv's/Classifer_metrics.csv","a")
+    f = open("../csv's/Classifer_metrics_1Layer.csv","a")
     f.write(f"{0},{loss_t.item()}, {loss_v.item()}\n")
     f.close()
 
@@ -309,7 +309,7 @@ elif (arg1 == "Classify"):
             epoch_train_loss = running_trainloss / len(train_loader)
             epoch_val_loss = running_val_loss / len(val_loader)
             val_acc = 100.0 * n_correct / n_samples
-            f = open("../csv's/Classifer_metrics.csv","a")
+            f = open("../csv's/Classifer_metrics_1Layer.csv","a")
             f.write(f"{epoch+1},{epoch_train_loss},{epoch_val_loss},{train_acc},{val_acc}\n")
             f.close()
             print(f'Validation Accuracy for {epoch+1}: {val_acc}')
