@@ -51,7 +51,8 @@ class VICReg(nn.Module):
         self.fc3 = nn.Linear(64,embedding_dimension)
         self.fc1_classify = nn.Linear(128,64)
         self.fc2_classfiy = nn.Linear(64,64)
-        self.fc3_classify = nn.Linear(128,10)
+        self.fc3_classify = nn.Linear(64,10)
+        self.fc4_classify = nn.Linear(128,10)
 
     def forward(self, x):
         if (arg1 == "Train"):
@@ -62,6 +63,7 @@ class VICReg(nn.Module):
             x = self.max_pool(x)
             x = F.relu(self.conv3(x))
             x = self.max_pool(x)
+            torch.save(model_vicreg.state_dict(), FILE)
             #print(f"Shape of Representations space after encoder {x.shape}")
             # Shape of Representations space (Y and Y prime) is [64, 128, 1, 1]
             x = x.view(-1,128)
@@ -83,17 +85,17 @@ class VICReg(nn.Module):
             # print(f"Shape after flatenning {x.shape}")
            # x = F.relu(self.fc1_classify(x))
            # x = F.relu(self.fc2_classfiy(x))
-            x = self.fc3_classify(x)
+            x = self.fc4_classify(x)
             # print(f"Shape after entire Network {x.shape}")
         return x
     def data_aug(self, img_tensor):
         aug = transforms.RandomResizedCrop(20, scale=(0.08,0.1))(img_tensor)
         aug = transforms.RandomHorizontalFlip(p=0.5)(aug)
         aug = transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.2, hue=0.1)(aug)
-        aug = transforms.RandomGrayscale(0.2)(aug)
+        #aug = transforms.RandomGrayscale(0.2)(aug)
         aug = transforms.GaussianBlur(kernel_size=23, sigma=0.5)(aug)
         aug = transforms.RandomSolarize(threshold=0.3,p=0.1)(aug)
-        aug = transforms.Normalize()(aug)
+        #aug = transforms.Normalize()(aug)
         return aug
     def off_diagonal(self, x):
         n, m = x.shape
@@ -220,7 +222,7 @@ if (arg1 == "Train"):
 
             running_val_loss += loss_val.item()
         # depending on # of epochs, save the model
-        torch.save(model_vicreg.state_dict(), FILE)
+        #torch.save(model_vicreg.state_dict(), FILE)
 
 
         epoch_loss = running_loss / len(train_loader)
