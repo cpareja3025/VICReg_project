@@ -148,10 +148,9 @@ class VICReg(nn.Module):
             val_loss_b, _, _, _, = model.VIC_Reg_loss(aug1, aug2, model)
             print(loss_b.item())
             print(val_loss_b.item())
-           # f = open("../csv's/VICReg_metrics_64_space.csv", "a")
-           # f.write(f"{0},{loss_b.item()}, {val_loss_b.item()}, {sim_loss_b}, {std_loss_b}, {cov_loss_b}\n")
-
-           # f.close()
+            f = open("../csv's/VICReg_metrics_64_space.csv", "a")
+            f.write(f"{0},{loss_b.item()}, {val_loss_b.item()}, {sim_loss_b}, {std_loss_b}, {cov_loss_b}\n")
+            f.close()
 
 class Classifier(nn.Module):
     def __init__(self):
@@ -183,7 +182,7 @@ if (arg1 == "Train"):
     print(summary(model_vicreg, input_size=[(batch_size, 1, 20, 20)]))
     optimizer = torch.optim.Adam(model_vicreg.parameters(), lr = learning_rate)
 
-    f = open("../csv's/VICReg_metrics_64_space.csv","w+" )
+    f = open("../csv's/VICReg_metrics_32_space.csv","w+" )
     f.write("Epoch, Train Loss, Val Loss, Inv Loss, Var Loss, Cov Loss\n")
     f.close()
 
@@ -229,7 +228,7 @@ if (arg1 == "Train"):
         epoch_var_loss = running_var_loss / len(train_loader)
         epoch_cov_loss = running_cov_loss / len(train_loader)
         epoch_val_loss = running_val_loss / len(val_loader)
-        f = open("../csv's/VICReg_metrics_64_space.csv", "a")
+        f = open("../csv's/VICReg_metrics_32_space.csv", "a")
         f.write(f"{epoch + 1}, {epoch_val_loss}, {epoch_loss}, {epoch_inv_loss}, {epoch_var_loss}, {epoch_cov_loss}\n")
         f.close()
 elif (arg1 == "Classify"):
