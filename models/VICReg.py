@@ -148,9 +148,10 @@ class VICReg(nn.Module):
             val_loss_b, _, _, _, = model.VIC_Reg_loss(aug1, aug2, model)
             print(loss_b.item())
             print(val_loss_b.item())
-            f = open("../csv's/VICReg_metrics_64_space.csv", "a")
-            f.write(f"{0},{loss_b.item()}, {val_loss_b.item()}, {sim_loss_b}, {std_loss_b}, {cov_loss_b}\n")
-            f.close()
+           # f = open("../csv's/VICReg_metrics_64_space.csv", "a")
+           # f.write(f"{0},{loss_b.item()}, {val_loss_b.item()}, {sim_loss_b}, {std_loss_b}, {cov_loss_b}\n")
+
+           # f.close()
 
 class Classifier(nn.Module):
     def __init__(self):
