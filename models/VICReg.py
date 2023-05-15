@@ -51,7 +51,7 @@ class VICReg(nn.Module):
         self.fc3 = nn.Linear(64,embedding_dimension)
         self.fc1_classify = nn.Linear(128,64)
         self.fc2_classfiy = nn.Linear(64,64)
-        self.fc3_classify = nn.Linear(64,10)
+        self.fc3_classify = nn.Linear(128,10)
 
     def forward(self, x):
         if (arg1 == "Train"):
@@ -81,8 +81,8 @@ class VICReg(nn.Module):
             ## Representation Space
             x = x.view(-1,128)
             # print(f"Shape after flatenning {x.shape}")
-            x = F.relu(self.fc1_classify(x))
-            x = F.relu(self.fc2_classfiy(x))
+           # x = F.relu(self.fc1_classify(x))
+           # x = F.relu(self.fc2_classfiy(x))
             x = self.fc3_classify(x)
             # print(f"Shape after entire Network {x.shape}")
         return x
