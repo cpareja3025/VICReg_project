@@ -82,11 +82,9 @@ class VICReg(nn.Module):
             # print(f"Shape of representation space {x.shape}")
             ## Representation Space
             x = x.view(-1,128)
-            # print(f"Shape after flatenning {x.shape}")
-           # x = F.relu(self.fc1_classify(x))
-           # x = F.relu(self.fc2_classfiy(x))
+            #print(f"Shape after flatenning {x.shape}")
             x = self.fc4_classify(x)
-            # print(f"Shape after entire Network {x.shape}")
+            #print(f"Shape after entire Network {x.shape}")
         return x
     def data_aug(self, img_tensor):
         aug = transforms.RandomResizedCrop(20, scale=(0.08,0.1))(img_tensor)
