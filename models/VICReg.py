@@ -17,7 +17,7 @@ FILE  = "../saved_models/VICReg.pth"
 #Hyper Parameters
 batch_size = 128
 learning_rate = 0.0001
-epochs = 100
+epochs = 50
 # Dimension (D) of the representations
 embedding_dimension = 32
 lam = 25
@@ -89,7 +89,7 @@ class VICReg(nn.Module):
     def data_aug(self, img_tensor):
         aug = transforms.RandomResizedCrop(20, scale=(0.08,0.1))(img_tensor)
         aug = transforms.RandomHorizontalFlip(p=0.5)(aug)
-        aug = transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.2, hue=0.1)(aug)
+       # aug = transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.2, hue=0.1)(aug)
         #aug = transforms.RandomGrayscale(0.2)(aug)
         aug = transforms.GaussianBlur(kernel_size=23, sigma=0.5)(aug)
         aug = transforms.RandomSolarize(threshold=0.3,p=0.1)(aug)
